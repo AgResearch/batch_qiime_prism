@@ -1,0 +1,29 @@
+# qiime_config
+# WARNING: DO NOT EDIT OR DELETE Qiime/qiime/support_files/qiime_config
+# To overwrite defaults, copy this file to $HOME/.qiime_config or a full path
+# specified by $QIIME_CONFIG_FP and edit that copy of the file.
+# Find details on this file at http://qiime.org/install/qiime_config.html
+
+# this template obtained from the original 
+# /stash/miniconda3/envs/qiime_1/lib/python2.7/site-packages/qiime/support_files/qiime_config
+# (simply by deleting the temp_dir record)
+#  - used to prepare a custom config to specify a different temp dir
+# (set QIIME_CONFIG_FP to the path to final custom config)
+
+cluster_jobs_fp	start_parallel_jobs.py
+blastmat_dir
+blastall_fp	blastall
+pynast_template_alignment_fp
+pynast_template_alignment_blastdb
+jobs_to_start	1
+seconds_to_sleep	1
+denoiser_min_per_core	50
+topiaryexplorer_project_dir
+torque_queue	friendlyq
+pick_otus_reference_seqs_fp
+assign_taxonomy_reference_seqs_fp
+assign_taxonomy_id_to_taxonomy_fp
+sc_queue	all.q
+slurm_queue
+slurm_memory
+slurm_time

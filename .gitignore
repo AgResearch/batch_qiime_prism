@@ -1,0 +1,4 @@
+*.pdf  
+seq_prisms
+legacy*
+etc/qiime_config_orig
