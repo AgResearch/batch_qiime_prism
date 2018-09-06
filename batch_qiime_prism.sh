@@ -168,16 +168,7 @@ export QIIME_CONFIG_FP=$OUT_DIR/qiime_config
    echo "temp_dir $OUT_DIR" | awk '{printf("%s\t%s\n",$1,$2);}' - >> $OUT_DIR/qiime_config
    echo "run will use qiime config file $OUT_DIR/qiime_config"
 
-
-   # set up the kmer anlaysis folder and large-ram config 
-   mkdir -p $OUT_DIR/kmer_analysis
-   mkdir -p $OUT_DIR/etc
-   cp ./etc/64GBRAM_slurm_array_job $OUT_DIR/etc
-   rm $OUT_DIR/kmer_analysis/tardis.toml    # in case left over from previous kmer_prism run , which may modify this 
-   echo "jobtemplatefile = \"$OUT_DIR/etc/64GBRAM_slurm_array_job\"" > $OUT_DIR/etc/tardis.toml
-
    cd $OUT_DIR
-
 }
 
 
@@ -326,14 +317,6 @@ function run_prism() {
       tardis --shell-include-file $OUT_DIR/configure_bioconductor_env.src Rscript --vanilla ./tax_summary_heatmap.r num_profiles=30 moniker=combined_rep_set_otu_table_L7 datafolder=$OUT_DIR/qiime_uclust 1\>\>$OUT_DIR/qiime_uclust/tax_summary_heatmap.stdout 2\>\>$OUT_DIR/qiime_uclust/tax_summary_heatmap.stderr
    fi
 
-
-
-   # run kmer analysis
-   if [ -f $OUT_DIR/kmer_analysis/kmer_entropy.k6.jpg ]; then
-      echo "skipping kmer analysis as landmark $OUT_DIR/kmer_analysis/kmer_entropy.k6.jpg exists"
-   else
-      $SEQ_PRISMS_BIN/kmer_prism.sh  -l $OUT_DIR/etc/tardis.toml -s .01 -a fasta -O  $OUT_DIR/kmer_analysis `cat $OUT_DIR/input_file_list.txt`  1>$OUT_DIR/kmer_analysis.stdout 2>$OUT_DIR/kmer_analysis.stderr
-   fi
 
 }
 
