@@ -1,0 +1,325 @@
+#!/bin/sh
+
+export SEQ_PRISMS_BIN=/dataset/gseq_processing/active/bin/batch_qiime_prism/seq_prisms 
+export BATCH_QIIME_PRISM_BIN=/dataset/gseq_processing/active/bin/batch_qiime_prism
+
+
+batch_qiime_version=$1
+
+function get_run_opts() {
+
+   DRY_RUN=no
+   DEBUG=no
+   HPC_TYPE=slurm
+   FILES=""
+   OUT_ROOT=""
+   BLAST_DATABASE=""
+   TAX_DATA=""
+   SIMILARITY=""
+   SEQLENGTH_MIN=""
+   FILE_TYPE=""
+
+   PROCESSING_ROOT=/dataset/gseq_processing/scratch/batch_qiime
+   PROCESSING_ROOT=/dataset/gseq_processing/scratch/batch_qiime
+
+
+   echo "*** batch_qiime analysis version $batch_qiime_version ***
+* note that you can paste into your terminal window by clicking your right mouse button
+* you can select text in the terminal window using your left mouse button
+* at any stage you can press CTRL-C to exit the dialogs
+* if you would prefer to run a single batch command, use batch_qiime_prism.sh (-h for help) - e.g. 
+  this allows you to run the analysis on any collection of input files
+"
+
+   ####### get and check DATASET
+   while [ 1 ] ; do
+      echo "
+please give the name of the dataset you would like to process (e.g. PJ_MGS00100 ) 
+"
+      read DATASET
+      if [ ! -z "$DATASET" ]; then 
+         if [ ! -d /dataset/${DATASET}/scratch  ]; then 
+            echo "sorry can't find (e.g.) /dataset/${DATASET}/scratch"
+         else
+            break
+         fi
+      fi
+
+   done
+
+   echo "will look for data in /dataset/${DATASET}/scratch"
+
+
+   ####### get and check whether to run locally or on the cluster
+   echo "
+
+should this run be queued on the compute cluster ? (y/n, default=y. If n, will be run locally)
+"
+   answer=y   
+   read answer
+   if [ "$answer" != "n" ]; then 
+      HPC_TYPE=slurm
+   else
+      HPC_TYPE=local
+   fi
+   
+
+   # set up folder
+   while [ 1 ]; do
+      NEW_ROOT=$PROCESSING_ROOT/$DATASET
+      answer=""
+      echo "please specify output base folder (or just press ENTER to use default , $PROCESSING_ROOT/$DATASET)"
+      read answer 
+      if [ ! -z $answer ]; then
+         NEW_ROOT=$answer
+      fi
+      if [ ! -z "$NEW_ROOT" ] ; then
+         if [ -d $NEW_ROOT ]; then
+            answer=y
+            echo "warning - $NEW_ROOT already exists, use anyway ? (y/n, default=y)"
+            read answer
+            if [[ ( $answer == "y" ) || ( -z $answer ) ]]; then
+               OUTPUT_ROOT=$NEW_ROOT
+               break
+            fi
+         else
+            mkdir -p $NEW_ROOT
+            if [ -d $NEW_ROOT ]; then
+               OUTPUT_ROOT=$NEW_ROOT
+               break
+            fi
+         fi
+      fi
+   done
+
+   echo "will use output root folder $OUTPUT_ROOT 
+
+   "
+
+   
+   ####### get and check the analysis type 
+   while [ 1 ] ; do
+      ANALYSIS=all
+      echo "
+please give which analysis you want (all, clean, qiime, kmer_analysis) (or just press enter to run all)  
+(notes :
+* entering qiime includes length filtering, clustering, taxonomy assignment and summarising) 
+* the clean step is currently run seperately , and is not done if you select all 
+)
+
+"
+      read ANALYSIS
+
+      if [ -z "$ANALYSIS" ]; then 
+         ANALYSIS=all
+      fi
+
+      if [[ ( "$ANALYSIS" != "all" ) && ( "$ANALYSIS" != "clean" ) && ( "$ANALYSIS" != "qiime" ) && ( "$ANALYSIS" != "kmer_analysis" ) ]]; then
+         echo "analysis must be one of all, clean, qiime, kmer_analysis"
+      else
+         break
+      fi
+   done
+
+   if [[ ( "$ANALYSIS" == "all" ) || ( "$ANALYSIS" == "qiime" ) ]]; then
+      ls $OUTPUT_ROOT/qiime_analysis/* > /dev/null 2>&1
+      if [ $? == 0 ] ; then
+         echo "found existing results under $OUTPUT_ROOT/qiime_analysis/* - are you sure you want to continue (e.g. complete an interrupted run) ? (y/n)"
+         answer=n
+         read answer
+         if [[ ( $answer != "y" )  && ( $answer != "Y" ) ]]; then
+            echo "ok quitting - please either use a different output folder or clean up $OUTPUT_ROOT/qiime_analysis"
+            exit 1
+         fi
+      fi
+   fi
+   if [[ ( "$ANALYSIS" == "all" ) || ( "$ANALYSIS" == "kmer_analysis" ) ]]; then
+      ls $OUTPUT_ROOT/kmer_analysis/* > /dev/null 2>&1
+      if [ $? == 0 ] ; then
+         echo "found existing results under $OUTPUT_ROOT/kmer_analysis - are you sure you want to continue (e.g. complete an interrupted run) ? (y/n)"
+         answer=n
+         read answer
+         if [[ ( $answer != "y" )  && ( $answer != "Y" ) ]]; then
+            echo "ok quitting - please use a different output folder"
+            exit 1
+         fi
+      fi
+   fi
+
+   echo "will use analysis=$ANALYSIS
+   "
+
+
+   ####### get and check the blast data to use 
+   if [[ ( $ANALYSIS == "all" ) || ( $ANALYSIS == "qiime" ) ]]; then
+      BLAST_DATABASE=/dataset/datacache/archive/metagenomics/build/combined_092016_silva.fasta
+      while [ 1 ] ; do
+         echo "
+please give the full path to the blast database (or just press enter to use default, /dataset/datacache/archive/metagenomics/build/combined_092016_silva.fasta) 
+"
+         read BLAST_DATABASE
+
+         if [ -z "$BLAST_DATABASE" ]; then 
+            BLAST_DATABASE=/dataset/datacache/archive/metagenomics/build/combined_092016_silva.fasta
+         fi
+
+         if [ -f ${BLAST_DATABASE}.nin ]; then
+            break
+         else
+            echo "could not find blast index file ${BLAST_DATABASE}.nin"
+         fi
+      done
+
+      echo "will use blast database $BLAST_DATABASE"
+   fi
+
+
+   ####### get and check the tax data to use 
+   if [[ ( $ANALYSIS == "all" ) || ( $ANALYSIS == "qiime" ) ]]; then
+      while [ 1 ] ; do
+         TAX_DATA=/dataset/datacache/archive/metagenomics/build/combined_092016_silva.taxonomy
+         echo "
+please give the full path to the taxonomy data (or just press enter to use default, /dataset/datacache/archive/metagenomics/build/combined_092016_silva.taxonomy) 
+"
+         read TAX_DATA
+
+         if [ -z "$TAX_DATA" ]; then 
+            TAX_DATA=/dataset/datacache/archive/metagenomics/build/combined_092016_silva.taxonomy
+         fi
+
+         if [ -f $TAX_DATA ]; then
+            break
+         else
+            echo "could not find tax data $TAX_DATA"
+         fi
+      done
+
+      echo "will use tax data $TAX_DATA"
+   fi
+
+
+   ####### get and check the similarity to use  
+   if [[ ( $ANALYSIS == "all" ) || ( $ANALYSIS == "qiime" ) ]]; then
+      while [ 1 ] ; do
+         SIMILARITY=0.97 
+         echo "
+please specify the similarity to use for clustering (or just press enter to use default, 0.97) 
+"
+         read SIMILARITY
+
+         if [ -z "$SIMILARITY" ]; then 
+            SIMILARITY=0.97
+         fi
+
+         python -c "print float('$SIMILARITY')" >/dev/null 2>&1
+         if [ $? != 0 ]; then
+            echo "looks like similarity requested ( $SIMILARITY ) is not a number"
+            exit 1
+         else
+            break
+         fi
+      done
+
+      echo "will use similarity $SIMILARITY"
+   fi
+
+
+   ####### get and check the minimum length to use  
+   if [[ ( $ANALYSIS == "all" ) || ( $ANALYSIS == "qiime" ) ]]; then
+      while [ 1 ] ; do
+         SEQLENGTH_MIN=200 
+         echo "
+please specify the minimum seq length (or just press enter to use default, 200) 
+"
+         read SEQLENGTH_MIN
+
+         if [ -z "$SEQLENGTH_MIN" ]; then 
+            SEQLENGTH_MIN=200
+         fi
+
+         python -c "print float('$SEQLENGTH_MIN')" >/dev/null 2>&1
+         if [ $? != 0 ]; then
+            echo "looks like minimum seqlength requested ( $SEQLENGTH_MIN ) is not a number"
+            exit 1
+         else
+            break
+         fi
+      done
+
+      echo "will use minimum seqlength $SEQLENGTH_MIN"
+   fi
+} # get_run_opts
+
+
+
+function run_qiime_analysis() {
+   mkdir -p $OUTPUT_ROOT/qiime_analysis
+
+   if [ ! -d $OUTPUT_ROOT/qiime_analysis ]; then
+      echo "unable to create output folder $OUTPUT_ROOT/qiime_analysis - quitting"
+      exit 1
+   fi
+
+   FILE_PATH=/dataset/$DATASET/scratch     
+   while [ 1 ]; do
+      echo "
+finding files to process..."
+      if [ -f $OUTPUT_ROOT/input_file_list.txt ]; then 
+         echo "will process the following files: . . . (press any key for a list - then press space bar to page through listing)"
+         read answer
+         more $OUTPUT_ROOT/input_file_list.txt 
+         answer=y
+         echo "OK ? (default = y)"
+         read answer
+         if [ -z "$answer" ]; then
+            answer=y
+         fi
+         if [ $answer == "y" ]; then
+            break
+         fi
+      fi
+
+      rm $OUTPUT_ROOT/input_file_list.txt > /dev/null 2>&1
+
+      find $FILE_PATH/ -name "*_R1_*fastq*.gz" -print > $OUTPUT_ROOT/input_file_list.txt 2>/dev/null
+
+      if [ $? != 0 ]; then
+         echo "unable to find any files like *_R1_*fastq*.gz under $FILE_PATH/"
+         while [ 1 ]; do
+            echo "please enter path to to files"
+            read $FILE_PATH
+            find $FILE_PATH/ -name "*_R1_*fastq*.gz" -print > $OUTPUT_ROOT/input_file_list.txt  2>/dev/null
+            if [ $? == 0 ]; then
+               break
+            fi
+         done
+      fi
+
+   done
+
+   echo "about to process  data files listed in $OUTPUT_ROOT/input_file_list.txt, writing results to $OUTPUT_ROOT/qiime_analysis"
+   echo "press enter to continue (or CTRL-C to cancel)"
+   read junk 
+   set -x
+   time $BATCH_QIIME_PRISM_BIN/batch_qiime_prism.sh -b $BLAST_DATABASE -t $TAX_DATA -m $SEQLENGTH_MIN -s $SIMILARITY  -O  $OUTPUT_ROOT/qiime_analysis `cat $OUTPUT_ROOT/input_file_list.txt`
+   set +x
+
+}
+
+
+function run_kmer_analysis() {
+   return
+}
+
+get_run_opts
+
+
+if [[ ( $ANALYSIS == "qiime" ) || ( $ANALYSIS == "all" ) ]]; then
+   run_qiime_analysis
+fi
+if [[ ( $ANALYSIS == "kmers" ) || ( $ANALYSIS == "all" ) ]]; then
+   run_kmer_analysis
+fi
+
+
+        

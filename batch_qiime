@@ -1,0 +1,24 @@
+#!/bin/sh
+
+function get_pipeline() {
+   export SEQ_PRISMS_BIN=/dataset/gseq_processing/active/bin/batch_qiime_prism/seq_prisms 
+   export BATCH_QIIME_PRISM_BIN=/dataset/gseq_processing/active/bin/batch_qiime_prism
+   cd $BATCH_QIIME_PRISM_BIN 
+   batch_qiime_version=$1
+   echo "preparing to run pipeline version $batch_qiime_version (press enter to continue)"
+   read answer
+   is_alpha=`echo $batch_qiime_version | grep alpha`
+   if [ ! $is_alpha ]; then 
+      git checkout -q $batch_qiime_version  
+      if [ $? != 0 ]; then
+         echo "unable to checkout pipeline version $batch_qiime_version"
+         exit 1
+      fi
+      exec ./_batch_qiime $batch_qiime_version
+   else
+      echo "(no checkout for alpha versions, just running in current branch)"
+      exec ./_batch_qiime $batch_qiime_version 
+   fi
+}
+
+get_pipeline v0.0.1-alpha
