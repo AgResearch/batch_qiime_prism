@@ -68,7 +68,7 @@ should this run be queued on the compute cluster ? (y/n, default=y. If n, will b
    while [ 1 ]; do
       NEW_ROOT=$PROCESSING_ROOT/$DATASET
       answer=""
-      echo "please specify output base folder (or just press ENTER to use default , $PROCESSING_ROOT/$DATASET)"
+      echo "please specify output base folder (or just press Enter/Return to use default , $PROCESSING_ROOT/$DATASET)"
       read answer 
       if [ ! -z $answer ]; then
          NEW_ROOT=$answer
@@ -99,19 +99,19 @@ should this run be queued on the compute cluster ? (y/n, default=y. If n, will b
    
    ####### get and check the analysis type 
    while [ 1 ] ; do
-      ANALYSIS=all
+      ANALYSIS=qiime
       echo "
 please give which analysis you want (all, clean, qiime, kmer_analysis) (or just press enter to run all)  
 (notes :
 * entering qiime includes length filtering, clustering, taxonomy assignment and summarising) 
-* the clean step is currently run seperately , and is not done if you select all 
+* the clean step is currently run seperately , and is not done if you select all or qiime 
 )
 
 "
       read ANALYSIS
 
       if [ -z "$ANALYSIS" ]; then 
-         ANALYSIS=all
+         ANALYSIS=qiime
       fi
 
       if [[ ( "$ANALYSIS" != "all" ) && ( "$ANALYSIS" != "clean" ) && ( "$ANALYSIS" != "qiime" ) && ( "$ANALYSIS" != "kmer_analysis" ) ]]; then
@@ -262,10 +262,8 @@ function run_qiime_analysis() {
 
    FILE_PATH=/dataset/$DATASET/scratch     
    while [ 1 ]; do
-      echo "
-finding files to process..."
       if [ -f $OUTPUT_ROOT/input_file_list.txt ]; then 
-         echo "will process the following files: . . . (press any key for a list - then press space bar to page through listing)"
+         echo "will process the following files: . . . (press Enter/Return for a list - then press space bar to page through listing)"
          read answer
          more $OUTPUT_ROOT/input_file_list.txt 
          answer=y
@@ -276,11 +274,16 @@ finding files to process..."
          fi
          if [ $answer == "y" ]; then
             break
+         else
+            echo "
+ok quitting - you can edit the file $OUTPUT_ROOT/input_file_list.txt in order to customise the 
+files to process, or remove it so that the data folder is re-scanned for files to process, and try again"
+            exit 1
          fi
       fi
 
-      rm $OUTPUT_ROOT/input_file_list.txt > /dev/null 2>&1
-
+      echo "
+finding files to process..."
       find $FILE_PATH/ -name "*_R1_*fastq*.gz" -print > $OUTPUT_ROOT/input_file_list.txt 2>/dev/null
 
       if [ $? != 0 ]; then
@@ -288,6 +291,8 @@ finding files to process..."
          while [ 1 ]; do
             echo "please enter path to to files"
             read $FILE_PATH
+            echo "
+finding files to process..."
             find $FILE_PATH/ -name "*_R1_*fastq*.gz" -print > $OUTPUT_ROOT/input_file_list.txt  2>/dev/null
             if [ $? == 0 ]; then
                break
@@ -308,7 +313,25 @@ finding files to process..."
 
 
 function run_kmer_analysis() {
-   return
+   # set up the kmer anlaysis folder and large-ram config
+   mkdir -p  $OUTPUT_ROOT/kmer_analysis
+   mkdir -p  $OUTPUT_ROOT/etc
+   cp $BATCH_QIIME_PRISM_BIN/etc/64GBRAM_slurm_array_job $OUTPUT_ROOT/etc 
+   rm -f $OUTPUT_ROOT/etc/tardis.toml    # in case left over from previous kmer_prism run , which may modify this
+   echo "jobtemplatefile = \"$OUTPUT_ROOT/etc/64GBRAM_slurm_array_job\"" > $OUTPUT_ROOT/etc/tardis.toml
+
+
+   # run kmer analysis
+   if [ -f $OUTPUT_ROOT/kmer_analysis/kmer_entropy.k6.jpg ]; then
+      echo "skipping kmer analysis as landmark $OUTPUT_ROOT/kmer_analysis/kmer_entropy.k6.jpg exists"
+   else
+      echo "about to run a kmer analysis for files listed in $OUTPUT_ROOT/input_file_list.txt, writing results to $OUTPUT_ROOT/kmer_analysis"
+      echo "press enter to continue (or CTRL-C to cancel)"
+      read junk
+      set -x
+      $SEQ_PRISMS_BIN/kmer_prism.sh -s .01 -a fasta -O  $OUTPUT_ROOT/kmer_analysis `cat $OUTPUT_ROOT/input_file_list.txt`  1>$OUTPUT_ROOT/kmer_analysis.stdout 2>$OUTPUT_ROOT/kmer_analysis.stderr
+      set +x
+   fi
 }
 
 get_run_opts
@@ -317,7 +340,7 @@ get_run_opts
 if [[ ( $ANALYSIS == "qiime" ) || ( $ANALYSIS == "all" ) ]]; then
    run_qiime_analysis
 fi
-if [[ ( $ANALYSIS == "kmers" ) || ( $ANALYSIS == "all" ) ]]; then
+if [[ ( $ANALYSIS == "kmer_analysis" ) || ( $ANALYSIS == "all" ) ]]; then
    run_kmer_analysis
 fi
 
