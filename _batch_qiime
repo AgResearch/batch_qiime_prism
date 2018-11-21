@@ -329,7 +329,7 @@ function run_kmer_analysis() {
       echo "press enter to continue (or CTRL-C to cancel)"
       read junk
       set -x
-      $SEQ_PRISMS_BIN/kmer_prism.sh -s .01 -a fasta -O  $OUTPUT_ROOT/kmer_analysis `cat $OUTPUT_ROOT/input_file_list.txt`  1>$OUTPUT_ROOT/kmer_analysis.stdout 2>$OUTPUT_ROOT/kmer_analysis.stderr
+      $SEQ_PRISMS_BIN/kmer_prism.sh -s .05 -a fasta -O  $OUTPUT_ROOT/kmer_analysis `cat $OUTPUT_ROOT/input_file_list.txt`  1>$OUTPUT_ROOT/kmer_analysis.stdout 2>$OUTPUT_ROOT/kmer_analysis.stderr
       set +x
    fi
 }
