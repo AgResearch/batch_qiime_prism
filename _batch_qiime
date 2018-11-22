@@ -6,6 +6,14 @@ export BATCH_QIIME_PRISM_BIN=/dataset/gseq_processing/active/bin/batch_qiime_pri
 
 batch_qiime_version=$1
 
+function read_answer_with_default() {
+   read answer
+   if [ -z "$answer" ]; then
+      answer=$@
+   fi
+}
+
+
 function get_run_opts() {
 
    DRY_RUN=no
@@ -55,8 +63,7 @@ please give the name of the dataset you would like to process (e.g. PJ_MGS00100 
 
 should this run be queued on the compute cluster ? (y/n, default=y. If n, will be run locally)
 "
-   answer=y   
-   read answer
+   read_answer_with_default y
    if [ "$answer" != "n" ]; then 
       HPC_TYPE=slurm
    else
@@ -66,28 +73,21 @@ should this run be queued on the compute cluster ? (y/n, default=y. If n, will b
 
    # set up folder
    while [ 1 ]; do
-      NEW_ROOT=$PROCESSING_ROOT/$DATASET
-      answer=""
       echo "please specify output base folder (or just press Enter/Return to use default , $PROCESSING_ROOT/$DATASET)"
-      read answer 
-      if [ ! -z $answer ]; then
-         NEW_ROOT=$answer
-      fi
-      if [ ! -z "$NEW_ROOT" ] ; then
+      read_answer_with_default $PROCESSING_ROOT/$DATASET
+      NEW_ROOT=$answer
+      if [ -d $NEW_ROOT ]; then
+         echo "warning - $NEW_ROOT already exists, use anyway ? (y/n, default=y)"
+         read_answer_with_default y
+         if [[ ( $answer == "y" ) || ( -z $answer ) ]]; then
+            OUTPUT_ROOT=$NEW_ROOT
+            break
+         fi
+      else
+         mkdir -p $NEW_ROOT
          if [ -d $NEW_ROOT ]; then
-            answer=y
-            echo "warning - $NEW_ROOT already exists, use anyway ? (y/n, default=y)"
-            read answer
-            if [[ ( $answer == "y" ) || ( -z $answer ) ]]; then
-               OUTPUT_ROOT=$NEW_ROOT
-               break
-            fi
-         else
-            mkdir -p $NEW_ROOT
-            if [ -d $NEW_ROOT ]; then
-               OUTPUT_ROOT=$NEW_ROOT
-               break
-            fi
+            OUTPUT_ROOT=$NEW_ROOT
+            break
          fi
       fi
    done
@@ -101,18 +101,15 @@ should this run be queued on the compute cluster ? (y/n, default=y. If n, will b
    while [ 1 ] ; do
       ANALYSIS=qiime
       echo "
-please give which analysis you want (all, clean, qiime, kmer_analysis) (or just press enter to run all)  
+please give which analysis you want (all, clean, qiime, kmer_analysis) (or just press enter to run qiime)  
 (notes :
 * entering qiime includes length filtering, clustering, taxonomy assignment and summarising) 
 * the clean step is currently run seperately , and is not done if you select all or qiime 
 )
 
 "
-      read ANALYSIS
-
-      if [ -z "$ANALYSIS" ]; then 
-         ANALYSIS=qiime
-      fi
+      read_answer_with_default qiime
+      ANALYSIS=$answer
 
       if [[ ( "$ANALYSIS" != "all" ) && ( "$ANALYSIS" != "clean" ) && ( "$ANALYSIS" != "qiime" ) && ( "$ANALYSIS" != "kmer_analysis" ) ]]; then
          echo "analysis must be one of all, clean, qiime, kmer_analysis"
@@ -125,8 +122,7 @@ please give which analysis you want (all, clean, qiime, kmer_analysis) (or just 
       ls $OUTPUT_ROOT/qiime_analysis/* > /dev/null 2>&1
       if [ $? == 0 ] ; then
          echo "found existing results under $OUTPUT_ROOT/qiime_analysis/* - are you sure you want to continue (e.g. complete an interrupted run) ? (y/n)"
-         answer=n
-         read answer
+         read_answer_with_default n
          if [[ ( $answer != "y" )  && ( $answer != "Y" ) ]]; then
             echo "ok quitting - please either use a different output folder or clean up $OUTPUT_ROOT/qiime_analysis"
             exit 1
@@ -137,8 +133,7 @@ please give which analysis you want (all, clean, qiime, kmer_analysis) (or just 
       ls $OUTPUT_ROOT/kmer_analysis/* > /dev/null 2>&1
       if [ $? == 0 ] ; then
          echo "found existing results under $OUTPUT_ROOT/kmer_analysis - are you sure you want to continue (e.g. complete an interrupted run) ? (y/n)"
-         answer=n
-         read answer
+         read_answer_with_default n
          if [[ ( $answer != "y" )  && ( $answer != "Y" ) ]]; then
             echo "ok quitting - please use a different output folder"
             exit 1
@@ -152,16 +147,12 @@ please give which analysis you want (all, clean, qiime, kmer_analysis) (or just 
 
    ####### get and check the blast data to use 
    if [[ ( $ANALYSIS == "all" ) || ( $ANALYSIS == "qiime" ) ]]; then
-      BLAST_DATABASE=/dataset/datacache/archive/metagenomics/build/combined_092016_silva.fasta
       while [ 1 ] ; do
          echo "
 please give the full path to the blast database (or just press enter to use default, /dataset/datacache/archive/metagenomics/build/combined_092016_silva.fasta) 
 "
-         read BLAST_DATABASE
-
-         if [ -z "$BLAST_DATABASE" ]; then 
-            BLAST_DATABASE=/dataset/datacache/archive/metagenomics/build/combined_092016_silva.fasta
-         fi
+         read_answer_with_default /dataset/datacache/archive/metagenomics/build/combined_092016_silva.fasta
+         BLAST_DATABASE=$answer
 
          if [ -f ${BLAST_DATABASE}.nin ]; then
             break
@@ -177,15 +168,11 @@ please give the full path to the blast database (or just press enter to use defa
    ####### get and check the tax data to use 
    if [[ ( $ANALYSIS == "all" ) || ( $ANALYSIS == "qiime" ) ]]; then
       while [ 1 ] ; do
-         TAX_DATA=/dataset/datacache/archive/metagenomics/build/combined_092016_silva.taxonomy
          echo "
 please give the full path to the taxonomy data (or just press enter to use default, /dataset/datacache/archive/metagenomics/build/combined_092016_silva.taxonomy) 
 "
-         read TAX_DATA
-
-         if [ -z "$TAX_DATA" ]; then 
-            TAX_DATA=/dataset/datacache/archive/metagenomics/build/combined_092016_silva.taxonomy
-         fi
+         read_answer_with_default /dataset/datacache/archive/metagenomics/build/combined_092016_silva.taxonomy 
+         TAX_DATA=$answer
 
          if [ -f $TAX_DATA ]; then
             break
@@ -201,15 +188,11 @@ please give the full path to the taxonomy data (or just press enter to use defau
    ####### get and check the similarity to use  
    if [[ ( $ANALYSIS == "all" ) || ( $ANALYSIS == "qiime" ) ]]; then
       while [ 1 ] ; do
-         SIMILARITY=0.97 
          echo "
-please specify the similarity to use for clustering (or just press enter to use default, 0.97) 
+please specify the similarity to use for clustering (or just press enter to use default, 0.99) 
 "
-         read SIMILARITY
-
-         if [ -z "$SIMILARITY" ]; then 
-            SIMILARITY=0.97
-         fi
+         read_answer_with_default 0.99
+         SIMILARITY=$answer
 
          python -c "print float('$SIMILARITY')" >/dev/null 2>&1
          if [ $? != 0 ]; then
@@ -231,11 +214,8 @@ please specify the similarity to use for clustering (or just press enter to use 
          echo "
 please specify the minimum seq length (or just press enter to use default, 200) 
 "
-         read SEQLENGTH_MIN
-
-         if [ -z "$SEQLENGTH_MIN" ]; then 
-            SEQLENGTH_MIN=200
-         fi
+         read_answer_with_default 200
+         SEQLENGTH_MIN=$answer
 
          python -c "print float('$SEQLENGTH_MIN')" >/dev/null 2>&1
          if [ $? != 0 ]; then
@@ -266,12 +246,8 @@ function run_qiime_analysis() {
          echo "will process the following files: . . . (press Enter/Return for a list - then press space bar to page through listing)"
          read answer
          more $OUTPUT_ROOT/input_file_list.txt 
-         answer=y
          echo "OK ? (default = y)"
-         read answer
-         if [ -z "$answer" ]; then
-            answer=y
-         fi
+         read_answer_with_default y
          if [ $answer == "y" ]; then
             break
          else
