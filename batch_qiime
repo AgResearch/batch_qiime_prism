@@ -1,5 +1,22 @@
 #!/bin/sh
 
+function check_python() {
+   version=`python --version 2>&1`
+   echo $version | grep -q "Python 3" 
+   if [ $? == 0 ]; then
+      echo "Warning you are running Python 3 by default ( $version ) - this pipeline requires python 2, trying /usr/bin/python. . ."
+      version=`/usr/bin/python --version 2>&1` 
+      echo $version | grep -q "Python 3" 
+      if [ $? == 0 ]; then
+         echo "Sorry can't find python 2 - needed by this pipeline. Please adjust run-time environment to include python2"
+         exit 1
+      else
+         export PATH="/usr/bin:$PATH"
+         echo "note - prepended /usr/bin to PATH for this session"
+      fi
+   fi
+}
+
 function get_pipeline() {
    export SEQ_PRISMS_BIN=/dataset/gseq_processing/active/bin/batch_qiime_prism/seq_prisms 
    export BATCH_QIIME_PRISM_BIN=/dataset/gseq_processing/active/bin/batch_qiime_prism
@@ -21,4 +38,5 @@ function get_pipeline() {
    fi
 }
 
+check_python
 get_pipeline v0.0.1-alpha
