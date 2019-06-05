@@ -278,7 +278,12 @@ finding files to process..."
 
    done
 
+   echo "time $BATCH_QIIME_PRISM_BIN/batch_qiime_prism.sh -b $BLAST_DATABASE -t $TAX_DATA -m $SEQLENGTH_MIN -s $SIMILARITY  -O  $OUTPUT_ROOT/qiime_analysis \`cat $OUTPUT_ROOT/input_file_list.txt\`" > $OUTPUT_ROOT/run.src
+
+
    echo "about to process  data files listed in $OUTPUT_ROOT/input_file_list.txt, writing results to $OUTPUT_ROOT/qiime_analysis"
+   echo "using . . ."
+   cat  $OUTPUT_ROOT/run.src
    echo "press enter to continue (or CTRL-C to cancel)"
    read junk 
    set -x
