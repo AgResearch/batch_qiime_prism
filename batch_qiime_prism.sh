@@ -300,6 +300,7 @@ function run_prism() {
       echo "skipping summarise taxa as landmark $OUT_DIR/qiime_uclust/combined_rep_set_otu_table_L10.txt already exists"
    else
       tardis --shell-include-file $OUT_DIR/configure_qiime_env.src summarize_taxa.py -i $OUT_DIR/qiime_uclust/combined_rep_set_otu_table.txt -o $OUT_DIR/qiime_uclust -a -L 4,6,7,10 1\>$OUT_DIR/qiime_uclust/summarize_taxa.stdout 2\>$OUT_DIR/qiime_uclust/summarize_taxa.stderr
+      tardis --shell-include-file $OUT_DIR/configure_qiime_env.src biom convert -i $OUT_DIR/qiime_uclust/combined_rep_set_otu_table.txt -o $OUT_DIR/qiime_uclust/table.from_biom_w_taxonomy.txt --to-tsv --header-key taxonomy
       if [ $? != 0 ]; then
          echo "** error code returned from summarize_taxa, giving up **"
          exit 1
