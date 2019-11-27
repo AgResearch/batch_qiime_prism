@@ -8,7 +8,7 @@
 #SBATCH --cpus-per-task=4          #number of threads per process
 #SBATCH --hint=nomultithread         # enable hyperthreading
 #SBATCH --mem-per-cpu=64G
-#SBATCH --partition=inv-iranui,inv-blade-g8,inv-bigmem     # Use nodes in any partition
+#SBATCH --partition=inv-iranui,inv-blade-g8,inv-blade-g8-fast,inv-bigmem,inv-bigmem-fast     # Use nodes in any partition
 #SBATCH --array=$array_start-$array_stop%50          # Iterate 1 to N, but only run up to 50 concurrent runs at once
 #SBATCH --error=$hpcdir/run-%A_%a.stderr
 #SBATCH --output=$hpcdir/run-%A_%a.stdout
