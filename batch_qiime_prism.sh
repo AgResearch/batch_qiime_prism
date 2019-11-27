@@ -143,6 +143,12 @@ function configure_env() {
    cat >$OUT_DIR/tardis.toml <<EOF
 seqlength_min=$seqlength_min
 EOF
+
+   cp ./etc/240WALL_slurm_array_job $OUT_DIR
+   cat >$OUT_DIR/tardis.toml.240wall <<EOF
+jobtemplatefile = "$OUT_DIR/240WALL_slurm_array_job"
+EOF
+
    echo "
 export CONDA_ENVS_PATH=$CONDA_ENVS_PATH
 conda activate biopython
@@ -254,7 +260,11 @@ function run_prism() {
    if [ -f $OUT_DIR/qiime_uclust/combined_clusters.uc ]; then
       echo "skipping otu picking as $OUT_DIR/qiime_uclust/combined_clusters.uc already exists"
    else
+      # need more time for this step 
+      mv $OUT_DIR/tardis.toml $OUT_DIR/tardis.toml.orig
+      cat $OUT_DIR/tardis.toml.240wall  > $OUT_DIR/tardis.toml
       tardis --shell-include-file $OUT_DIR/configure_qiime_env.src pick_otus.py -m uclust -s $similarity -i $OUT_DIR/combined.fa -o $OUT_DIR/qiime_uclust > $OUT_DIR/pick_otu.log 2>&1
+      cat $OUT_DIR/tardis.toml.orig >  $OUT_DIR/tardis.toml
       if [ $? != 0 ]; then
          echo "** error code returned from pick_otus.py job, giving up **"
          exit 1
