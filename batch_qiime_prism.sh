@@ -256,6 +256,10 @@ function run_prism() {
       echo "(not rebuilding $OUT_DIR/combined.fa )"
    fi
 
+   # log qiime version etc
+   tardis --shell-include-file $OUT_DIR/configure_qiime_env.src print_qiime_config.py \> $OUT_DIR/print_qiime_config.log 2\>$OUT_DIR/print_qiime_config.log 
+   tardis --shell-include-file $OUT_DIR/configure_qiime_env.src blastall --help  \> $OUT_DIR/blastall.log 2\>$OUT_DIR/blastall.log 
+
    # pick OTU
    if [ -f $OUT_DIR/qiime_uclust/combined_clusters.uc ]; then
       echo "skipping otu picking as $OUT_DIR/qiime_uclust/combined_clusters.uc already exists"
@@ -263,7 +267,7 @@ function run_prism() {
       # need more time for this step 
       mv $OUT_DIR/tardis.toml $OUT_DIR/tardis.toml.orig
       cat $OUT_DIR/tardis.toml.240wall  > $OUT_DIR/tardis.toml
-      tardis --shell-include-file $OUT_DIR/configure_qiime_env.src pick_otus.py -m uclust -s $similarity -i $OUT_DIR/combined.fa -o $OUT_DIR/qiime_uclust > $OUT_DIR/pick_otu.log 2>&1
+      tardis --shell-include-file $OUT_DIR/configure_qiime_env.src pick_otus.py -m uclust -s $similarity -i $OUT_DIR/combined.fa -o $OUT_DIR/qiime_uclust \> $OUT_DIR/pick_otu.log 2\>$OUT_DIR/pick_otu.log
       cat $OUT_DIR/tardis.toml.orig >  $OUT_DIR/tardis.toml
       if [ $? != 0 ]; then
          echo "** error code returned from pick_otus.py job, giving up **"
@@ -276,7 +280,7 @@ function run_prism() {
    if [ -f $OUT_DIR/qiime_uclust/combined_rep_set.txt  ]; then
       echo "skipping rep_set picking as $OUT_DIR/qiime_uclust/combined_rep_set.txt already exists"
    else
-      tardis --shell-include-file $OUT_DIR/configure_qiime_env.src pick_rep_set.py -i $OUT_DIR/qiime_uclust/combined_otus.txt -f $OUT_DIR/combined.fa -o $OUT_DIR/qiime_uclust/combined_rep_set.txt > $OUT_DIR/pick_rep_set.log 2>&1
+      tardis --shell-include-file $OUT_DIR/configure_qiime_env.src pick_rep_set.py -i $OUT_DIR/qiime_uclust/combined_otus.txt -f $OUT_DIR/combined.fa -o $OUT_DIR/qiime_uclust/combined_rep_set.txt \> $OUT_DIR/pick_rep_set.log 2\>$OUT_DIR/pick_rep_set.log
       if [ $? != 0 ]; then
          echo "** error code returned from pick_rep_set.py job, giving up **"
          exit 1
