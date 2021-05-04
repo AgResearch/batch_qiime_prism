@@ -241,6 +241,10 @@ function fake_prism() {
 }
 
 function run_prism() {
+   # allow plenty of time for all steps 
+   mv $OUT_DIR/tardis.toml $OUT_DIR/tardis.toml.orig
+   cat $OUT_DIR/tardis.toml.240wall  > $OUT_DIR/tardis.toml
+
    # this prepares each file
    make -f batch_qiime_prism.mk -d -k  --no-builtin-rules -j 16 `cat $OUT_DIR/batch_qiime_targets.txt` > $OUT_DIR/batch_qiime_prism.log 2>&1
 
@@ -264,11 +268,7 @@ function run_prism() {
    if [ -f $OUT_DIR/qiime_uclust/combined_clusters.uc ]; then
       echo "skipping otu picking as $OUT_DIR/qiime_uclust/combined_clusters.uc already exists"
    else
-      # need more time for this step 
-      mv $OUT_DIR/tardis.toml $OUT_DIR/tardis.toml.orig
-      cat $OUT_DIR/tardis.toml.240wall  > $OUT_DIR/tardis.toml
       tardis --shell-include-file $OUT_DIR/configure_qiime_env.src pick_otus.py -m uclust -s $similarity -i $OUT_DIR/combined.fa -o $OUT_DIR/qiime_uclust \> $OUT_DIR/pick_otu.log 2\>$OUT_DIR/pick_otu.log
-      cat $OUT_DIR/tardis.toml.orig >  $OUT_DIR/tardis.toml
       if [ $? != 0 ]; then
          echo "** error code returned from pick_otus.py job, giving up **"
          exit 1
