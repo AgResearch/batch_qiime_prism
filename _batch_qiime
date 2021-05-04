@@ -278,7 +278,10 @@ finding files to process..."
 
    done
 
-   echo "time $BATCH_QIIME_PRISM_BIN/batch_qiime_prism.sh -b $BLAST_DATABASE -t $TAX_DATA -m $SEQLENGTH_MIN -s $SIMILARITY  -O  $OUTPUT_ROOT/qiime_analysis \`cat $OUTPUT_ROOT/input_file_list.txt\`" > $OUTPUT_ROOT/run.src
+   echo "
+export SEQ_PRISMS_BIN=/dataset/gseq_processing/active/bin/batch_qiime_prism/seq_prisms
+export BATCH_QIIME_PRISM_BIN=/dataset/gseq_processing/active/bin/batch_qiime_prism
+time $BATCH_QIIME_PRISM_BIN/batch_qiime_prism.sh -b $BLAST_DATABASE -t $TAX_DATA -m $SEQLENGTH_MIN -s $SIMILARITY  -O  $OUTPUT_ROOT/qiime_analysis \`cat $OUTPUT_ROOT/input_file_list.txt\`" > $OUTPUT_ROOT/run.src
 
 
    echo "about to process  data files listed in $OUTPUT_ROOT/input_file_list.txt, writing results to $OUTPUT_ROOT/qiime_analysis"
