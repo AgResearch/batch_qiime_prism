@@ -42,12 +42,15 @@ function get_run_opts() {
    ####### get and check DATASET
    while [ 1 ] ; do
       echo "
-please give the name of the dataset you would like to process (e.g. PJ_MGS00100 ) 
+please give the name of the dataset you would like to process (e.g. PJ_MGS00100 ), or a folder containing your sequence data 
 "
       read DATASET
       if [ ! -z "$DATASET" ]; then 
+         if [ -d $DATASET ]; then
+            break
+         fi
          if [ ! -d /dataset/${DATASET}/scratch  ]; then 
-            echo "sorry can't find (e.g.) /dataset/${DATASET}/scratch"
+            echo "sorry can't find (e.g.) /dataset/${DATASET}/scratch (and $DATASET is not an accessible folder)"
          else
             break
          fi
@@ -55,7 +58,11 @@ please give the name of the dataset you would like to process (e.g. PJ_MGS00100 
 
    done
 
-   echo "will look for data in /dataset/${DATASET}/scratch"
+   if [ -d ${DATASET} ]; then
+      echo "will look for data in ${DATASET}" 
+   else 
+      echo "will look for data in /dataset/${DATASET}/scratch"
+   fi
 
 
    ####### get and check whether to run locally or on the cluster
@@ -72,9 +79,16 @@ should this run be queued on the compute cluster ? (y/n, default=y. If n, will b
    
 
    # set up folder
+   if [ -d $DATASET ]; then
+      OUTPUT_ROOT=`basename $DATASET`
+      OUTPUT_ROOT=$PROCESSING_ROOT/$OUTPUT_ROOT
+   else
+      OUTPUT_ROOT=$PROCESSING_ROOT/$DATASET
+   fi
+
    while [ 1 ]; do
-      echo "please specify output base folder (or just press Enter/Return to use default , $PROCESSING_ROOT/$DATASET)"
-      read_answer_with_default $PROCESSING_ROOT/$DATASET
+      echo "please specify output base folder (or just press Enter/Return to use default , $OUTPUT_ROOT )"
+      read_answer_with_default $OUTPUT_ROOT 
       NEW_ROOT=$answer
       if [ -d $NEW_ROOT ]; then
          echo "warning - $NEW_ROOT already exists, use anyway ? (y/n, default=y)"
@@ -240,48 +254,100 @@ function run_qiime_analysis() {
       exit 1
    fi
 
-   FILE_PATH=/dataset/$DATASET/scratch     
+   if [ -d $DATASET ]; then
+      FILE_PATH=$DATASET
+   else
+      FILE_PATH=/dataset/$DATASET/scratch     
+   fi
+
    while [ 1 ]; do
       if [ -f $OUTPUT_ROOT/input_file_list.txt ]; then 
-         echo "will process the following files: . . . (press Enter/Return for a list - then press space bar to page through listing)"
-         read answer
-         more $OUTPUT_ROOT/input_file_list.txt 
-         echo "OK ? (default = y)"
-         read_answer_with_default y
-         if [ $answer == "y" ]; then
-            break
-         else
-            echo "
-ok quitting - you can edit the file $OUTPUT_ROOT/input_file_list.txt in order to customise the 
-files to process, or remove it so that the data folder is re-scanned for files to process, and try again"
-            exit 1
-         fi
+         break
       fi
 
       echo "
 finding files to process..."
       find $FILE_PATH/ -name "*_R1_*fastq*.gz" -print > $OUTPUT_ROOT/input_file_list.txt 2>/dev/null
-
-      if [ $? != 0 ]; then
-         echo "unable to find any files like *_R1_*fastq*.gz under $FILE_PATH/"
-         while [ 1 ]; do
-            echo "please enter path to to files"
-            read $FILE_PATH
-            echo "
+      return_code=$?
+      if [ $return_code == 0 ]; then
+         num_files=`cat $OUTPUT_ROOT/input_file_list.txt | wc -l`
+         if [ $num_files == 0 ]; then
+            return_code=1
+         fi
+      fi 
+      if [ $return_code != 0 ]; then
+         # try just listing all .gz files 
+         ls $FILE_PATH/*.gz > $OUTPUT_ROOT/input_file_list.txt 2>/dev/null
+         if [ $? != 0 ]; then
+            echo "unable to find any files like *.gz under $FILE_PATH/"
+            while [ 1 ]; do
+               echo "please enter path to to files (or CTRL-C and edit $OUTPUT_ROOT/input_file_list.txt so it contains the names of the files to process)"
+               read $FILE_PATH
+               echo "
 finding files to process..."
-            find $FILE_PATH/ -name "*_R1_*fastq*.gz" -print > $OUTPUT_ROOT/input_file_list.txt  2>/dev/null
-            if [ $? == 0 ]; then
-               break
-            fi
-         done
+               find $FILE_PATH/ -name "*_R1_*fastq*.gz" -print > $OUTPUT_ROOT/input_file_list.txt  2>/dev/null
+               return_code=$?
+               if [ $return_code == 0 ]; then
+                  num_files=`cat $OUTPUT_ROOT/input_file_list.txt | wc -l`
+                  if [ $num_files == 0 ]; then
+                     return_code=1
+                  fi
+               fi
+               if [ $return_code == 0 ]; then
+                  break
+               else
+                  ls $FILE_PATH/*.gz > $OUTPUT_ROOT/input_file_list.txt 2>/dev/null
+                  if [ $? == 0 ]; then
+                     break
+                  fi
+               fi
+            done
+         fi
       fi
 
+   done
+
+
+   # confirm file list
+   echo "will process the following files: . . . (press Enter/Return for a list - then press space bar to page through listing)"
+   read answer
+   more $OUTPUT_ROOT/input_file_list.txt
+   echo "OK ? (default = y)"
+   read_answer_with_default y
+   if [ $answer == "y" ]; then
+      break
+   else
+      echo "
+ok quitting - you can edit the file $OUTPUT_ROOT/input_file_list.txt in order to customise the
+files to process, or remove it so that the data folder is re-scanned for files to process, and try again"
+      exit 1
+   fi
+
+
+   # check we can parse sample names from filenames - if not prompt for a custom regular expression 
+   echo "
+   checking we can parse sample ID from filenames. . . "
+   regexp='^[^_]+_(\S+)_'
+   while [ 1 ]; do
+      for file in `cat $OUTPUT_ROOT/input_file_list.txt`; do
+         $BATCH_QIIME_PRISM_BIN/add_sample_name.py -n -r "$regexp" $file
+         return_code=$?
+         if [ $return_code != 0 ]; then
+            echo "Could not parse sample name from $file using a \"$regexp\" - please enter a regular expression to use ( e.g. ^([^_]+)_  might work)" 
+            read_answer_with_default $regexp
+            regexp=$answer
+            break
+         fi
+      done
+      if [ $return_code == 0 ]; then
+         break
+      fi
    done
 
    echo "
 export SEQ_PRISMS_BIN=/dataset/gseq_processing/active/bin/batch_qiime_prism/seq_prisms
 export BATCH_QIIME_PRISM_BIN=/dataset/gseq_processing/active/bin/batch_qiime_prism
-time $BATCH_QIIME_PRISM_BIN/batch_qiime_prism.sh -b $BLAST_DATABASE -t $TAX_DATA -m $SEQLENGTH_MIN -s $SIMILARITY  -O  $OUTPUT_ROOT/qiime_analysis \`cat $OUTPUT_ROOT/input_file_list.txt\`" > $OUTPUT_ROOT/run.src
+time $BATCH_QIIME_PRISM_BIN/batch_qiime_prism.sh -x \"$regexp\" -b $BLAST_DATABASE -t $TAX_DATA -m $SEQLENGTH_MIN -s $SIMILARITY  -O  $OUTPUT_ROOT/qiime_analysis \`cat $OUTPUT_ROOT/input_file_list.txt\`" > $OUTPUT_ROOT/run.src
 
 
    echo "about to process  data files listed in $OUTPUT_ROOT/input_file_list.txt, writing results to $OUTPUT_ROOT/qiime_analysis"
@@ -290,7 +356,7 @@ time $BATCH_QIIME_PRISM_BIN/batch_qiime_prism.sh -b $BLAST_DATABASE -t $TAX_DATA
    echo "press enter to continue (or CTRL-C to cancel)"
    read junk 
    set -x
-   time $BATCH_QIIME_PRISM_BIN/batch_qiime_prism.sh -b $BLAST_DATABASE -t $TAX_DATA -m $SEQLENGTH_MIN -s $SIMILARITY  -O  $OUTPUT_ROOT/qiime_analysis `cat $OUTPUT_ROOT/input_file_list.txt`
+   time $BATCH_QIIME_PRISM_BIN/batch_qiime_prism.sh -x "$regexp" -b $BLAST_DATABASE -t $TAX_DATA -m $SEQLENGTH_MIN -s $SIMILARITY  -O  $OUTPUT_ROOT/qiime_analysis `cat $OUTPUT_ROOT/input_file_list.txt`
    set +x
 
 }

@@ -14,6 +14,7 @@ function get_opts() {
    taxonomy_lookup_file=
    seqlength_min=200
    similarity=0.97
+   regexp='^[^_]+_(\S+)_'
    help_text="
 \n
 ./batch_qiime_prism.sh  [-h] [-n] [-d] [-b blast_data -t tax_data -m min_length -s similarity  -O outdir [-C local|slurm ] input_file_names\n
@@ -25,7 +26,7 @@ example:\n
 "
 
    # defaults:
-   while getopts ":nhdfO:C:b:t:m:s:" opt; do
+   while getopts ":nhdfO:C:b:t:m:s:x:" opt; do
    case $opt in
        n)
          DRY_RUN=yes
@@ -51,6 +52,9 @@ example:\n
          ;;
        t)
          taxonomy_lookup_file=$OPTARG
+         ;;
+       x)
+         regexp=$OPTARG
          ;;
        m)
          seqlength_min=$OPTARG
@@ -126,6 +130,7 @@ function echo_opts() {
   echo taxonomy_blast_database=$taxonomy_blast_database
   echo taxonomy_lookup_file=$taxonomy_lookup_file
   echo similarity=$similarity
+  echo regexp=$regexp
 }
 
 #
@@ -219,9 +224,10 @@ function get_targets() {
          fi
       fi
 
+      # (the regexp arg needs to look escaped like this in the script "\"^([^_]+)_\"" )
       echo "#!/bin/bash
 #prepare length-filtered fasta files with sequence naming syntax suitable for qiime
-tardis -d $OUT_DIR -c 999999999  cat _condition_fastq2fasta_input_$file \| $OUT_DIR/add_sample_name.py $file \> _condition_uncompressedtext_output_$OUT_DIR/${file_base}.combined.fasta
+tardis -d $OUT_DIR -c 999999999  cat _condition_fastq2fasta_input_$file \| $OUT_DIR/add_sample_name.py -r \"\\\"${regexp}\\\"\" $file \> _condition_uncompressedtext_output_$OUT_DIR/${file_base}.combined.fasta
 " > $script_filename
       chmod +x $script_filename 
 
