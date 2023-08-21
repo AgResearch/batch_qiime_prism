@@ -80,7 +80,8 @@ should this run be queued on the compute cluster ? (y/n, default=y. If n, will b
 
    # set up folder
    if [ -d $DATASET ]; then
-      OUTPUT_ROOT=`basename $DATASET`
+      # try removing the first component of the path and then appending that to processing_root
+      OUTPUT_ROOT=`echo $DATASET | cut -d'/' -f3-`
       OUTPUT_ROOT=$PROCESSING_ROOT/$OUTPUT_ROOT
    else
       OUTPUT_ROOT=$PROCESSING_ROOT/$DATASET
@@ -276,8 +277,8 @@ finding files to process..."
          fi
       fi 
       if [ $return_code != 0 ]; then
-         # try just listing all .gz files 
-         ls $FILE_PATH/*.gz > $OUTPUT_ROOT/input_file_list.txt 2>/dev/null
+         # try just listing all .gz files , attempting to filter just R1
+         ls $FILE_PATH/*.gz | egrep "(_R1_|_1\.f).*.gz$" > $OUTPUT_ROOT/input_file_list.txt 2>/dev/null
          if [ $? != 0 ]; then
             echo "unable to find any files like *.gz under $FILE_PATH/"
             while [ 1 ]; do
@@ -296,7 +297,7 @@ finding files to process..."
                if [ $return_code == 0 ]; then
                   break
                else
-                  ls $FILE_PATH/*.gz > $OUTPUT_ROOT/input_file_list.txt 2>/dev/null
+                  ls $FILE_PATH/*.gz | egrep "(_R1_|_1\.f).*.gz$" > $OUTPUT_ROOT/input_file_list.txt 2>/dev/null
                   if [ $? == 0 ]; then
                      break
                   fi
@@ -333,16 +334,25 @@ files to process, or remove it so that the data folder is re-scanned for files t
          $BATCH_QIIME_PRISM_BIN/add_sample_name.py -n -r "$regexp" $file
          return_code=$?
          if [ $return_code != 0 ]; then
-            echo "Could not parse sample name from $file using a \"$regexp\" - please enter a regular expression to use ( e.g. ^([^_]+)_  might work)" 
+            echo "Could not parse sample name from $file using a \"$regexp\" - please enter a regular expression to use ( e.g. something like ^([^_]+)_  or ^([^_]+_L1)_ might work)" 
             read_answer_with_default $regexp
             regexp=$answer
             break
          fi
       done
       if [ $return_code == 0 ]; then
-         break
+         echo "do those sample names look OK ? (y/n)"
+         read_answer_with_default y
+         if [ $answer != "y" ]; then
+            echo "please enter a suitable regular expression. Examples : ^[^_]+_(\S+)_    ^([^_]+)_    ^([^_]+_L1)_ "
+            read_answer_with_default $regexp
+            regexp=$answer
+         else 
+            break
+         fi
       fi
    done
+
 
    echo "
 export SEQ_PRISMS_BIN=/dataset/gseq_processing/active/bin/batch_qiime_prism/seq_prisms
